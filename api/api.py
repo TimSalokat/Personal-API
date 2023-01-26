@@ -3,6 +3,7 @@ from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os, sys
+import datetime
 
 import random
 
@@ -29,14 +30,21 @@ Todos = []
 Projects = []
 
 def log(message, color="green"):
-    prefix = colored("[Back-Log]", color)
-    print(f"{prefix} - {message}")
+    prefix = colored("[Back-Log]", "green")
+    _time = datetime.datetime.now()
+    time = colored(f"[{_time.hour}:{_time.minute}:{_time.second}]", "green")
+
+    if(color != "green"):
+        message = colored(message, color);
+
+    print(f"{time} {prefix} {message}")
 
 
 def Startup():
     try:
         Todos = eval(load_save("todos.txt"))
         Projects = eval(load_save("projects.txt"))
+        log("Successfully initialized")
     except:
         with open("saves/todos.txt", "w") as file:
             file.write("[]")
@@ -51,7 +59,7 @@ def Startup():
 
 class Todo(BaseModel):
     uuid: str
-    project_uuid: str
+    project_uuid: str  
 
     title: str
     description: str
@@ -66,6 +74,13 @@ class Project(BaseModel):
     finished: int
 
     color: str
+
+def getProjectByUuid(uuid):
+    for _project in eval(load_save("projects.txt")):
+        print(_project);
+        if _project["uuid"] == uuid:
+            return _project    
+
 
 def save(toSave,fileName):
     path = "saves/" + fileName
@@ -85,26 +100,33 @@ async def ping():
 
 @app.get("/get-todos")
 async def get_todos():
+    log("Got Todos")
     Todos = eval(load_save("todos.txt"))
     return {"todos": Todos}
 
 @app.get("/get-projects")
 async def get_projects():
+    log("Got Projects")
     Projects = eval(load_save("projects.txt"))
     return {"projects": Projects}
 
 @app.post("/add-todo")
 async def add_todo(todo: Todo):
-    print(todo)
+
+    project = getProjectByUuid(todo.project_uuid);
+
     Todos.append({
         "uuid": todo.uuid,
         "project_uuid": todo.project_uuid,
+
+        "project_title": project["title"],
+        "project_color": project["color"],
+
         "title": todo.title,
         "description": todo.description,
         "priority": todo.priority,
         "finished": False })
-    # update_index()
-    log(("Added Todo: ", todo.title))
+    log(f"Added Todo: {todo.title} - in Project: {project['title']}", "yellow")
     save(Todos, "todos.txt")
     return {"response": "Successful"}
 
@@ -121,7 +143,7 @@ async def add_project(project: Project):
         "color": hexadecimal,
     })
     save(Projects, "projects.txt")
-    log(("Added Project: ", project.title))
+    log(f"Added Project: {project.title}", "yellow")
     return {"response": "Successful"}
 
 @app.put("/set-finished")
@@ -140,14 +162,14 @@ async def edit_todo(uuid:str, todo: Todo):
             todo_item["description"] = todo.description
             todo_item["project"] = todo.project
     save(Todos, "todos.txt")
-    log(("Changed todo: " + todo.heading))
+    log(f"Changed Todo {todo.heading}")
     return {"response": "Successful"}
 
 @app.delete("/del-todo")
 async def del_todo(uuid: str):
     for todo in Todos:
         if(todo["uuid"] == uuid):
-            log(("removed ", todo["heading"]), "red")
+            log(f"Removed {todo['heading']}", "yellow")
             Todos.remove(todo)
     save(Todos, "todos.txt")
     return {"response": "Successful"}
@@ -157,7 +179,7 @@ async def del_project(title: str):
     title = title.title()
     for project in Projects:
         if(project["title"] == title):
-            log(("removed ", title), "red")
+            log(f"Removed {title}", "yellow")
             Projects.remove(project)
     save(Projects, "projects.txt")
     return {"response": "Successful"}
