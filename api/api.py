@@ -64,6 +64,7 @@ class Todo(BaseModel):
     title: str
     description: str
     priority: int
+    finished: bool
 
 class Project(BaseModel):
     uuid: str
@@ -77,9 +78,13 @@ class Project(BaseModel):
 
 def getProjectByUuid(uuid):
     for _project in eval(load_save("projects.txt")):
-        print(_project);
         if _project["uuid"] == uuid:
             return _project    
+
+def getTodoByUuid(uuid):
+    for _todo in eval(load_save("todos.txt")):
+        if _todo["uuid"] == uuid:
+            return _todo    
 
 
 def save(toSave,fileName):
@@ -114,6 +119,7 @@ async def get_projects():
 async def add_todo(todo: Todo):
 
     project = getProjectByUuid(todo.project_uuid);
+    project["total"] += 1;
 
     Todos.append({
         "uuid": todo.uuid,
@@ -125,7 +131,7 @@ async def add_todo(todo: Todo):
         "title": todo.title,
         "description": todo.description,
         "priority": todo.priority,
-        "finished": False })
+        "finished": todo.finished })
     log(f"Added Todo: {todo.title} - in Project: {project['title']}", "yellow")
     save(Todos, "todos.txt")
     return {"response": "Successful"}
@@ -148,9 +154,15 @@ async def add_project(project: Project):
 
 @app.put("/set-finished")
 async def set_finished(uuid: str):
-    for todo in Todos:
-        if(todo["uuid"] == uuid):
-            todo["finished"] = not todo["finished"]
+
+    todo = getTodoByUuid(uuid);
+
+    project = getProjectByUuid(todo["project_uuid"]);
+    if(todo["finished"] == False): project["finished"] += 1;
+    else: project["finished"] -= 1;  
+
+    todo["finished"] = not todo["finished"]
+    log(f"Changed status of: {todo['title']} to {todo['finished']}")
     save(Todos, "todos.txt")
     return {"response": "Successful"}
 
