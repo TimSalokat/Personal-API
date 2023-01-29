@@ -1,15 +1,27 @@
 from __future__ import annotations
-from fastapi import FastAPI, Body
+
+from .database import crud, models, schemas
+from .database.database import SessionLocal, engine
+
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import os, sys
-import datetime
-
-import random
+from sqlalchemy.orm import Session
+import os, sys, datetime, random
 
 from termcolor import colored
 
+models.Base.metadata.create_all(bind=engine)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 app = FastAPI()
+
 origins = [
     "http://localhost:3000",
     "localhost:3000",
@@ -103,54 +115,78 @@ async def ping():
     log("Ping", "green")
     return True
 
-@app.get("/get-todos")
-async def get_todos():
-    log("Got Todos")
-    Todos = eval(load_save("todos.txt"))
-    return {"todos": Todos}
+@app.get("/get-tasks") #? new
+async def get_tasks(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    log("Got Tasks")
+    return crud.get_tasks(db, skip=skip, limit=limit)
+# async def get_todos():
+#     log("Got Todos")
+#     Todos = eval(load_save("todos.txt"))
+#     return {"todos": Todos}
 
-@app.get("/get-projects")
-async def get_projects():
+@app.get("/get-projects", response_model=list[schemas.Project]) #? new
+# async def get_projects():
+#     log("Got Projects")
+#     Projects = eval(load_save("projects.txt"))
+#     return {"projects": Projects}
+async def get_projects(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session=Depends(get_db)
+):
     log("Got Projects")
-    Projects = eval(load_save("projects.txt"))
-    return {"projects": Projects}
+    return crud.get_projects(db, skip=skip, limit=limit)
 
-@app.post("/add-todo")
-async def add_todo(todo: Todo):
+@app.post("/add-task/{project_id}") #? new
+async def create_task(
+    project_id: str,
+    task: schemas.TaskCreate,
+     db: Session = Depends(get_db)
+):
+    return crud.create_task(db=db, task=task, project_id=project_id)
 
-    project = getProjectByUuid(todo.project_uuid);
-    project["total"] += 1;
+# async def add_todo(todo: Todo):
 
-    Todos.append({
-        "uuid": todo.uuid,
-        "project_uuid": todo.project_uuid,
+#     project = getProjectByUuid(todo.project_uuid);
+#     project["total"] += 1;
 
-        "project_title": project["title"],
-        "project_color": project["color"],
+#     Todos.append({
+#         "uuid": todo.uuid,
+#         "project_uuid": todo.project_uuid,
 
-        "title": todo.title,
-        "description": todo.description,
-        "priority": todo.priority,
-        "finished": todo.finished })
-    log(f"Added Todo: {todo.title} - in Project: {project['title']}", "yellow")
-    save(Todos, "todos.txt")
-    return {"response": "Successful"}
+#         "project_title": project["title"],
+#         "project_color": project["color"],
 
-@app.post("/add-project")
-async def add_project(project: Project):
+#         "title": todo.title,
+#         "description": todo.description,
+#         "priority": todo.priority,
+#         "finished": todo.finished })
+#     log(f"Added Todo: {todo.title} - in Project: {project['title']}", "yellow")
+#     save(Todos, "todos.txt")
+#     return {"response": "Successful"}
+
+@app.post("/add-project") # ? new
+async def create_project(project: schemas.ProjectCreate, db: Session = Depends(get_db)):
+    return crud.create_project(db=db, project=project)
+
+# async def add_project(project: Project):
     
-    hexadecimal = ["#"+''.join([random.choice('ABCDEF0123456789') for i in range(6)])]
-    Projects.append({
-        "uuid": project.uuid,
-        "title": project.title.title(),
-        "description": project.description,
-        "total": 0,
-        "finished": 0,
-        "color": hexadecimal,
-    })
-    save(Projects, "projects.txt")
-    log(f"Added Project: {project.title}", "yellow")
-    return {"response": "Successful"}
+#     hexadecimal = ["#"+''.join([random.choice('ABCDEF0123456789') for i in range(6)])]
+#     Projects.append({
+#         "uuid": project.uuid,
+#         "title": project.title.title(),
+#         "description": project.description,
+#         "total": 0,
+#         "finished": 0,
+#         "color": hexadecimal,
+#     })
+#     save(Projects, "projects.txt")
+#     log(f"Added Project: {project.title}", "yellow")
+#     return {"response": "Successful"}
 
 @app.put("/set-finished")
 async def set_finished(uuid: str):
