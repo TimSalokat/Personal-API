@@ -64,7 +64,7 @@ async def ping():
     log("Ping", "green")
     return True
 
-@app.get("/get-tasks") #? new
+@app.get("/get-tasks", response_model=list[schemas.Task]) #? new
 async def get_tasks(
     skip: int = 0,
     limit: int = 100,
@@ -88,26 +88,25 @@ async def create_task(
     task: schemas.TaskCreate,
      db: Session = Depends(get_db)
 ):
+    log(f"Created Task: {task.title}")
+    project = crud.get_project(db=db, project_id=project_id)
+    project.total_tasks = project.total_tasks + 1
+    db.commit()
     return crud.create_task(db=db, task=task, project_id=project_id)
 
 @app.post("/add-project") # ? new
 async def create_project(project: schemas.ProjectCreate, db: Session = Depends(get_db)):
     return crud.create_project(db=db, project=project)
 
-@app.put("/set-finished")
-#! Need rework to work with sqlite
-# async def set_finished(uuid: str):
-
-#     todo = getTodoByUuid(uuid);
-
-#     project = getProjectByUuid(todo["project_uuid"]);
-#     if(todo["finished"] == False): project["finished"] += 1;
-#     else: project["finished"] -= 1;  
-
-#     todo["finished"] = not todo["finished"]
-#     log(f"Changed status of: {todo['title']} to {todo['finished']}")
-#     save(Todos, "todos.txt")
-#     return {"response": "Successful"}
+@app.put("/set-finished") # ?new
+async def set_finished(task_id: str, db: Session = Depends(get_db)):
+    task = crud.get_task(db=db, task_id=task_id)
+    task.finished = not task.finished
+    project = crud.get_project(db=db, project_id=task.project_id)
+    if(task.finished): project.finished_tasks = project.finished_tasks + 1
+    else: project.finished_tasks = project.finished_tasks - 1
+    db.commit();
+    
 
 @app.put("/edit-todo/{uuid}")
 #! Need rework to work with sqlite
