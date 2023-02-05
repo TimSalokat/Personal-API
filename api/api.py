@@ -1,22 +1,35 @@
 from __future__ import annotations
 
 from .database import crud, models, schemas
-from .database.database import SessionLocal, engine
+from .database.database import SessionTesting, SessionPersistent, testing_engine, persistent_engine
 
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 import os, sys, datetime, random
+from starlette.requests import Request 
 
 from termcolor import colored
 
-models.Base.metadata.create_all(bind=engine)
+models.Base.metadata.create_all(bind=testing_engine)
+models.Base.metadata.create_all(bind=persistent_engine)
 
-def get_db():
-    db = SessionLocal()
+def get_db(testing=False):
+    if(testing):
+        log("Using testing", "yellow")
+        db = SessionTesting()
+    else:
+        db = SessionPersistent()
     try:
-        yield db
+        return db
+    finally:
+        db.close()
+
+def get_persistent_db():
+    db = SessionPersistent()
+    try:
+        return db
     finally:
         db.close()
 
@@ -48,17 +61,6 @@ def log(message, color="green"):
 
     print(f"{time} {prefix} {message}")
 
-# ! Should be outdated
-# def getProjectByUuid(uuid):
-#     for _project in eval(load_save("projects.txt")):
-#         if _project["uuid"] == uuid:
-#             return _project    
-
-# def getTodoByUuid(uuid):
-#     for _todo in eval(load_save("todos.txt")):
-#         if _todo["uuid"] == uuid:
-#             return _todo    
-
 @app.get("/ping")
 async def ping():
     log("Ping", "green")
@@ -68,8 +70,9 @@ async def ping():
 async def get_tasks(
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db)
+    testing: bool = False
 ):
+    db = get_db(testing)
     log("Got Tasks")
     return crud.get_tasks(db, skip=skip, limit=limit)
 
@@ -77,8 +80,9 @@ async def get_tasks(
 async def get_projects(
     skip: int = 0,
     limit: int = 100,
-    db: Session=Depends(get_db)
+    testing: bool = False
 ):
+    db = get_db(testing)
     log("Got Projects")
     return crud.get_projects(db, skip=skip, limit=limit)
 
@@ -86,8 +90,9 @@ async def get_projects(
 async def create_task(
     project_id: str,
     task: schemas.TaskCreate,
-     db: Session = Depends(get_db)
+    testing: bool = False
 ):
+    db = get_db(testing)
     log(f"Created Task: {task.title}")
     project = crud.get_project(db=db, project_id=project_id)
     project.total_tasks = project.total_tasks + 1
@@ -95,30 +100,35 @@ async def create_task(
     return crud.create_task(db=db, task=task, project_id=project_id)
 
 @app.post("/add-project") # ? new
-async def create_project(project: schemas.ProjectCreate, db: Session = Depends(get_db)):
+async def create_project(project: schemas.ProjectCreate, testing: bool = False):
+    db = get_db(testing)
     return crud.create_project(db=db, project=project)
 
 @app.put("/set-finished") # ?new
-async def set_finished(task_id: str, db: Session = Depends(get_db)):
+async def set_finished(task_id: str, testing: bool = False):
+    db = get_db(testing)
+    # Update Task
     task = crud.get_task(db=db, task_id=task_id)
     task.finished = not task.finished
+
+    # Update Project
     project = crud.get_project(db=db, project_id=task.project_id)
     if(task.finished): project.finished_tasks = project.finished_tasks + 1
     else: project.finished_tasks = project.finished_tasks - 1
     db.commit();
-    
 
-@app.put("/edit-todo/{uuid}")
-#! Need rework to work with sqlite
-# async def edit_todo(uuid:str, todo: Todo):
-#     for todo_item in Todos:
-#         if(todo_item["uuid"] == uuid):
-#             todo_item["heading"] = todo.heading
-#             todo_item["description"] = todo.description
-#             todo_item["project"] = todo.project
-#     save(Todos, "todos.txt")
-#     log(f"Changed Todo {todo.heading}")
-#     return {"response": "Successful"}
+
+@app.put("/edit-task") #? new
+async def edit_task(
+    task: schemas.TaskCreate,
+    request: Request,
+    testing: bool = False
+):
+    db = get_db(testing)
+    log("Changed Task")
+    project_id = request.headers.get("project_id")
+    task_id = request.headers.get("task_id")
+    return crud.edit_task(db=db, task=task, project_id=project_id, task_id=task_id)
 
 @app.delete("/del-todo")
 #! Need rework to work with sqlite

@@ -43,3 +43,16 @@ def create_task(db: Session, task: schemas.TaskCreate, project_id: str):
     db.commit()
     db.refresh(db_task)
     return db_task
+
+def edit_task(db: Session, task: schemas.TaskCreate, project_id: str, task_id: str):
+    db_changed = get_task(db=db, task_id=task_id)
+    
+    db_changed.project_id = project_id
+    db_changed.title = task.title
+    db_changed.description = task.description
+    db_changed.priority = task.priority
+    
+    db.commit()
+    db.refresh(db_changed)
+    return db_changed
+    
