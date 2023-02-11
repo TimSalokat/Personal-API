@@ -99,12 +99,12 @@ async def create_task(
     db.commit()
     return crud.create_task(db=db, task=task, project_id=project_id)
 
-@app.post("/add-project") # ? new
+@app.post("/add-project") 
 async def create_project(project: schemas.ProjectCreate, testing: bool = False):
     db = get_db(testing)
     return crud.create_project(db=db, project=project)
 
-@app.put("/set-finished") # ?new
+@app.put("/set-finished")
 async def set_finished(task_id: str, testing: bool = False):
     db = get_db(testing)
     # Update Task
@@ -116,7 +116,6 @@ async def set_finished(task_id: str, testing: bool = False):
     if(task.finished): project.finished_tasks = project.finished_tasks + 1
     else: project.finished_tasks = project.finished_tasks - 1
     db.commit();
-
 
 @app.put("/edit-task") #? new
 async def edit_task(
@@ -130,24 +129,31 @@ async def edit_task(
     task_id = request.headers.get("task_id")
     return crud.edit_task(db=db, task=task, project_id=project_id, task_id=task_id)
 
-@app.delete("/del-todo")
-#! Need rework to work with sqlite
-# async def del_todo(uuid: str):
-#     for todo in Todos:
-#         if(todo["uuid"] == uuid):
-#             log(f"Removed {todo['heading']}", "yellow")
-#             Todos.remove(todo)
-#     save(Todos, "todos.txt")
-#     return {"response": "Successful"}
+@app.put("/edit-project") #? new
+async def edit_project(
+    project: schemas.ProjectCreate,
+    request: Request,
+    testing: bool = False
+):
+    db = get_db(testing)
+    log("Changed Project")
+    project_id = request.headers.get("project_id")
+    return crud.edit_project(db=db, project=project, project_id=project_id)
+
+@app.delete("/del-task")
+async def del_task(
+    request: Request,
+    testing: bool = False
+):
+    db = get_db(testing)
+    log("Deleted Task")
+    return crud.del_task(db=db, task_id=request.headers.get("task_id"))
 
 @app.delete("/del-project")
-async def placeholder():
-    pass
-#! Need rework to work with sqlite
-# async def del_project(title: str):
-#     title = title.title()
-#     for project in Projects:
-#         if(project["title"] == title):
-#             log(f"Removed {title}", "yellow")
-#             Projects.remove(project)
-#     save(Projects, "projects.txt")
+async def del_project(
+    request: Request,
+    testing: bool = False
+):
+    db = get_db(testing)
+    log("Deleted Project")
+    return crud.del_project(db=db, project_id=request.headers.get("project_id"))

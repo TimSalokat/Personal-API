@@ -18,6 +18,7 @@ class Task(TaskBase):
 
 class ProjectBase(BaseModel):
     title: str
+    color: str
 
 class ProjectCreate(ProjectBase):
     pass
@@ -28,7 +29,6 @@ class Project(ProjectBase):
     tasks: list[Task] = []
     total_tasks: int
     finished_tasks: int
-    color: str
 
     class Config:
         orm_mode = True

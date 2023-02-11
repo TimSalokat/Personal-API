@@ -13,7 +13,10 @@ def get_projects(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Project).offset(skip).limit(limit).all()
 
 def create_project(db: Session, project: schemas.ProjectCreate):
-    color = "#"+''.join(random.choice('ABCDEF0123456789') for i in range(6))
+    if(project.color == "#000000"):
+        color = "#"+''.join(random.choice('ABCDEF0123456789') for i in range(6))
+    else:
+        color = project.color
     db_project = models.Project(
         id=str(uuid.uuid4()),
         title=project.title,
@@ -55,4 +58,21 @@ def edit_task(db: Session, task: schemas.TaskCreate, project_id: str, task_id: s
     db.commit()
     db.refresh(db_changed)
     return db_changed
+
+def edit_project(db: Session, project:schemas.ProjectCreate, project_id: str):
+    db_changed = get_project(db=db, project_id=project_id)
+
+    db_changed.title = project.title
+    db_changed.color = project.color
     
+    db.commit()
+    db.refresh(db_changed)
+    return db_changed
+
+def del_task(db:Session, task_id: str):
+    db.query(models.Task).filter(models.Task.id == task_id).delete()
+    db.commit();
+
+def del_project(db:Session, project_id: str):
+    db.query(models.Project).filter(models.Project.id == project_id).delete()
+    db.commit();
