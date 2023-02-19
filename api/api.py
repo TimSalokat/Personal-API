@@ -21,6 +21,7 @@ def get_db(testing=False):
         db = SessionTesting()
     else:
         db = SessionPersistent()
+        
     try:
         return db
     finally:
@@ -61,12 +62,7 @@ def log(message, color="green"):
 
     print(f"{time} {prefix} {message}")
 
-@app.get("/ping")
-async def ping():
-    log("Ping", "green")
-    return True
-
-@app.get("/get-tasks", response_model=list[schemas.Task]) #? new
+@app.get("/get-tasks", response_model=list[schemas.Task]) 
 async def get_tasks(
     skip: int = 0,
     limit: int = 100,
@@ -76,7 +72,7 @@ async def get_tasks(
     log("Got Tasks")
     return crud.get_tasks(db, skip=skip, limit=limit)
 
-@app.get("/get-projects", response_model=list[schemas.Project]) #? new
+@app.get("/get-projects", response_model=list[schemas.Project]) 
 async def get_projects(
     skip: int = 0,
     limit: int = 100,
@@ -94,8 +90,6 @@ async def create_task(
 ):
     db = get_db(testing)
     log(f"Created Task: {task.title}")
-    project = crud.get_project(db=db, project_id=project_id)
-    project.total_tasks = project.total_tasks + 1
     db.commit()
     return crud.create_task(db=db, task=task, project_id=project_id)
 
@@ -104,17 +98,22 @@ async def create_project(project: schemas.ProjectCreate, testing: bool = False):
     db = get_db(testing)
     return crud.create_project(db=db, project=project)
 
+@app.post("/add-section")
+async def create_section(
+    section: schemas.SectionCreate,
+    request: Request,
+    testing: bool = False
+):
+    db = get_db(testing)
+    project_id = request.headers.get("project_id")
+    return crud.create_section(db=db, section=section, project_id=project_id)
+
 @app.put("/set-finished")
 async def set_finished(task_id: str, testing: bool = False):
     db = get_db(testing)
     # Update Task
     task = crud.get_task(db=db, task_id=task_id)
     task.finished = not task.finished
-
-    # Update Project
-    project = crud.get_project(db=db, project_id=task.project_id)
-    if(task.finished): project.finished_tasks = project.finished_tasks + 1
-    else: project.finished_tasks = project.finished_tasks - 1
     db.commit();
 
 @app.put("/edit-task") #? new
