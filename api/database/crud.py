@@ -41,8 +41,9 @@ def edit_project(db: Session, project:schemas.ProjectCreate, project_id: str):
     return db_changed
 
 def del_project(db:Session, project_id: str):
-    db.query(models.Project).filter(models.Project.id == project_id).delete()
-    db.commit();
+    project_to_delete = db.query(models.Project).filter(models.Project.id == project_id).first()
+    db.delete(project_to_delete)
+    db.commit()
 
 
 def get_task(db: Session, task_id: str):
