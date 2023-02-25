@@ -114,9 +114,11 @@ async def set_finished(task_id: str, testing: bool = False):
     # Update Task
     task = crud.get_task(db=db, task_id=task_id)
     task.finished = not task.finished
-    db.commit();
+    db.commit()
+    db.refresh(task)
+    return task
 
-@app.put("/edit-task") #? new
+@app.put("/edit-task")
 async def edit_task(
     task: schemas.TaskCreate,
     request: Request,
@@ -125,10 +127,11 @@ async def edit_task(
     db = get_db(testing)
     log("Changed Task")
     project_id = request.headers.get("project_id")
+    section_id = request.headers.get("section_id")
     task_id = request.headers.get("task_id")
-    return crud.edit_task(db=db, task=task, project_id=project_id, task_id=task_id)
+    return crud.edit_task(db=db, task=task, project_id=project_id, section_id=section_id, task_id=task_id)
 
-@app.put("/edit-project") #? new
+@app.put("/edit-project")
 async def edit_project(
     project: schemas.ProjectCreate,
     request: Request,
