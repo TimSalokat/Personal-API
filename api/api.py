@@ -3,14 +3,18 @@ from __future__ import annotations
 from .database import crud, models, schemas
 from .database.database import SessionTesting, SessionPersistent, testing_engine, persistent_engine
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
+
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+
 import os, sys, datetime, random
 from starlette.requests import Request 
 
 from termcolor import colored
+
+from .routes.task_tracker import projects
 
 models.Base.metadata.create_all(bind=testing_engine)
 models.Base.metadata.create_all(bind=persistent_engine)
@@ -21,7 +25,6 @@ def get_db(testing=False):
         db = SessionTesting()
     else:
         db = SessionPersistent()
-        
     try:
         return db
     finally:
@@ -35,6 +38,10 @@ def get_persistent_db():
         db.close()
 
 app = FastAPI()
+
+app.include_router(projects.router, prefix="/projects", tags=["Projects"])
+
+router = APIRouter();
 
 origins = [
     "http://localhost:3000",
@@ -141,6 +148,17 @@ async def edit_project(
     log("Changed Project")
     project_id = request.headers.get("project_id")
     return crud.edit_project(db=db, project=project, project_id=project_id)
+
+@app.put("/rename-section")
+async def rename_section(
+    request: Request,
+    testing: bool = False
+):
+    db = get_db(testing)
+    log("Renamed Section")
+    section_id = request.headers.get("section_id")
+    new_title = request.headers.get("new_title")
+    return crud.rename_section(db=db, section_id=section_id, new_title=new_title)
 
 @app.delete("/del-task")
 async def del_task(
