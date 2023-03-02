@@ -45,7 +45,6 @@ def del_project(db:Session, project_id: str):
     db.delete(project_to_delete)
     db.commit()
 
-
 def get_task(db: Session, task_id: str):
     return db.query(models.Task).filter(models.Task.id == task_id).first()
 
@@ -81,6 +80,9 @@ def del_task(db:Session, task_id: str):
     db.query(models.Task).filter(models.Task.id == task_id).delete()
     db.commit();
 
+def get_section(db:Session, section_id:str):
+    return db.query(models.Section).filter(models.Section.id == section_id).first();
+
 def create_section(db:Session, section: schemas.SectionCreate, project_id: str):
     db_section = models.Section(
         **section.dict(),
@@ -91,3 +93,12 @@ def create_section(db:Session, section: schemas.SectionCreate, project_id: str):
     db.commit()
     db.refresh(db_section);
     return db_section
+
+
+def rename_section(db: Session, section_id: str, new_title=str):
+    db_changed = get_section(db=db, section_id=section_id)
+    db_changed.title = new_title;
+
+    db.commit()
+    db.refresh(db_changed)
+    return db_changed
