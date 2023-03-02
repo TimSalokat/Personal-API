@@ -1,30 +1,23 @@
 from __future__ import annotations
 
 from .database import crud, models, schemas
-from .database.database import SessionTesting, SessionPersistent, testing_engine, persistent_engine
+from .database.database import SessionTesting, SessionPersistent, testing_engine, persistent_engine, get_db
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
+
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+
 import os, sys, datetime, random
 from starlette.requests import Request 
 
 from termcolor import colored
 
+from .routes.task_tracker import projects
+
 models.Base.metadata.create_all(bind=testing_engine)
 models.Base.metadata.create_all(bind=persistent_engine)
-
-def get_db(testing=False):
-    if(testing):
-        log("Using testing", "yellow")
-        db = SessionTesting()
-    else:
-        db = SessionPersistent()
-    try:
-        return db
-    finally:
-        db.close()
 
 def get_persistent_db():
     db = SessionPersistent()
@@ -34,6 +27,10 @@ def get_persistent_db():
         db.close()
 
 app = FastAPI()
+
+app.include_router(projects.router, prefix="/projects", tags=["Projects"])
+
+router = APIRouter();
 
 origins = [
     "http://localhost:3000",
@@ -61,12 +58,7 @@ def log(message, color="green"):
 
     print(f"{time} {prefix} {message}")
 
-@app.get("/ping")
-async def ping():
-    log("Ping", "green")
-    return True
-
-@app.get("/get-tasks", response_model=list[schemas.Task]) #? new
+@app.get("/get-tasks", response_model=list[schemas.Task]) 
 async def get_tasks(
     skip: int = 0,
     limit: int = 100,
@@ -76,7 +68,7 @@ async def get_tasks(
     log("Got Tasks")
     return crud.get_tasks(db, skip=skip, limit=limit)
 
-@app.get("/get-projects", response_model=list[schemas.Project]) #? new
+@app.get("/get-projects", response_model=list[schemas.Project]) 
 async def get_projects(
     skip: int = 0,
     limit: int = 100,
@@ -94,8 +86,6 @@ async def create_task(
 ):
     db = get_db(testing)
     log(f"Created Task: {task.title}")
-    project = crud.get_project(db=db, project_id=project_id)
-    project.total_tasks = project.total_tasks + 1
     db.commit()
     return crud.create_task(db=db, task=task, project_id=project_id)
 
@@ -104,20 +94,27 @@ async def create_project(project: schemas.ProjectCreate, testing: bool = False):
     db = get_db(testing)
     return crud.create_project(db=db, project=project)
 
+@app.post("/add-section")
+async def create_section(
+    section: schemas.SectionCreate,
+    request: Request,
+    testing: bool = False
+):
+    db = get_db(testing)
+    project_id = request.headers.get("project_id")
+    return crud.create_section(db=db, section=section, project_id=project_id)
+
 @app.put("/set-finished")
 async def set_finished(task_id: str, testing: bool = False):
     db = get_db(testing)
     # Update Task
     task = crud.get_task(db=db, task_id=task_id)
     task.finished = not task.finished
+    db.commit()
+    db.refresh(task)
+    return task
 
-    # Update Project
-    project = crud.get_project(db=db, project_id=task.project_id)
-    if(task.finished): project.finished_tasks = project.finished_tasks + 1
-    else: project.finished_tasks = project.finished_tasks - 1
-    db.commit();
-
-@app.put("/edit-task") #? new
+@app.put("/edit-task")
 async def edit_task(
     task: schemas.TaskCreate,
     request: Request,
@@ -126,10 +123,11 @@ async def edit_task(
     db = get_db(testing)
     log("Changed Task")
     project_id = request.headers.get("project_id")
+    section_id = request.headers.get("section_id")
     task_id = request.headers.get("task_id")
-    return crud.edit_task(db=db, task=task, project_id=project_id, task_id=task_id)
+    return crud.edit_task(db=db, task=task, project_id=project_id, section_id=section_id, task_id=task_id)
 
-@app.put("/edit-project") #? new
+@app.put("/edit-project")
 async def edit_project(
     project: schemas.ProjectCreate,
     request: Request,
@@ -139,6 +137,17 @@ async def edit_project(
     log("Changed Project")
     project_id = request.headers.get("project_id")
     return crud.edit_project(db=db, project=project, project_id=project_id)
+
+@app.put("/rename-section")
+async def rename_section(
+    request: Request,
+    testing: bool = False
+):
+    db = get_db(testing)
+    log("Renamed Section")
+    section_id = request.headers.get("section_id")
+    new_title = request.headers.get("new_title")
+    return crud.rename_section(db=db, section_id=section_id, new_title=new_title)
 
 @app.delete("/del-task")
 async def del_task(
