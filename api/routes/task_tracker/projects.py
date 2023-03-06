@@ -1,7 +1,7 @@
 
 import sys, os
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from starlette.requests import Request 
 from sqlalchemy.orm import Session
 
@@ -10,38 +10,45 @@ import uuid, random
 from ...database import models, schemas
 from ...database.database import get_db
 
+from ..auth import auth
+
 router = APIRouter();
 
-@router.get("/get", response_model=list[schemas.Project])
+@router.get("/get", 
+    response_model=list[schemas.Project])
 async def get(
+    owner: str,
     skip: int = 0,
     limit: int = 100,
-    testing: bool = False
 ):
-    db = get_db(testing)
-    return get_projects(db, skip=skip, limit=limit)
+    db = get_db()
+    return get_projects(db, skip=skip, limit=limit, owner=owner)
 
-@router.post("/add") 
-async def add(project: schemas.ProjectCreate, testing: bool = False):
-    db = get_db(testing)
-    return create_project(db=db, project=project)
+@router.post("/add",
+    dependencies=[Depends(auth.authentication_middleware)]) 
+async def add(
+    project: schemas.ProjectCreate,
+    request: Request
+):
+    db = get_db()
+    return create_project(db=db, project=project, owner=request.state.user_name)
 
-@router.put("/edit")
+@router.put("/edit",
+    dependencies=[Depends(auth.authentication_middleware)])
 async def edit(
     project: schemas.ProjectCreate,
     request: Request,
-    testing: bool = False
 ):
-    db = get_db(testing)
+    db = get_db()
     project_id = request.headers.get("project_id")
     return edit_project(db=db, project=project, project_id=project_id)
     
-@router.delete("/delete")
+@router.delete("/delete",
+    dependencies=[Depends(auth.authentication_middleware)])
 async def delete(
     request: Request,
-    testing: bool = False
 ):
-    db = get_db(testing)
+    db = get_db()
     return del_project(db=db, project_id=request.headers.get("project_id"))
 
 
@@ -52,10 +59,10 @@ def get_project(db: Session, project_id: str):
 def get_project_by_title(db: Session, title: str):
     return db.query(models.Project).filter(models.Project.title == title).first()
 
-def get_projects(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.Project).offset(skip).limit(limit).all()
+def get_projects(db: Session, owner: str, skip: int = 0, limit: int = 100):
+    return db.query(models.Project).filter(models.Project.owner == owner).offset(skip).limit(limit).all()
 
-def create_project(db: Session, project: schemas.ProjectCreate):
+def create_project(db: Session, project: schemas.ProjectCreate, owner: str):
     if(project.color == "#000000"):
         color = "#"+''.join(random.choice('ABCDEF0123456789') for i in range(6))
     else:
@@ -66,7 +73,8 @@ def create_project(db: Session, project: schemas.ProjectCreate):
         title=project.title,
         total_tasks=0,
         finished_tasks=0,
-        color=color
+        color=color,
+        owner=owner
         )
     db.add(db_project)
     db.commit()

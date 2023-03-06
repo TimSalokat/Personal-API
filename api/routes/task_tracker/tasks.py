@@ -1,7 +1,7 @@
 
 import sys, os
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 from starlette.requests import Request 
 from sqlalchemy.orm import Session
 
@@ -10,21 +10,27 @@ import uuid, random
 from ...database import models, schemas
 from ...database.database import get_db
 
+from ..auth import auth
+from ..task_tracker.projects import get_project
+
 router = APIRouter()
 
-@router.post("/add/{project_id}")
+@router.post("/add/{project_id}",
+    dependencies=[Depends(auth.authentication_middleware)])
 async def add(
     project_id: str,
+    request: Request,
     task: schemas.TaskCreate,
-    testing: bool = False
 ):
-    db = get_db(testing)
+    db = get_db()
     db.commit()
-    return create_task(db=db, task=task, project_id=project_id)
+    return create_task(db=db, task=task, project_id=project_id, owner=request.state.user_name)
 
 @router.put("/set-finished")
-async def set_finished(task_id: str, testing: bool = False):
-    db = get_db(testing)
+async def set_finished(
+    task_id: str,
+):
+    db = get_db()
     task = get_task(db=db, task_id=task_id)
     task.finished = not task.finished
 
@@ -32,24 +38,24 @@ async def set_finished(task_id: str, testing: bool = False):
     db.refresh(task)
     return task
 
-@router.put("/edit")
+@router.put("/edit",
+    dependencies=[Depends(auth.authentication_middleware)])
 async def edit(
     task: schemas.TaskCreate,
-    request: Request,
-    testing: bool = False
+    request: Request
 ):
-    db = get_db(testing)
+    db = get_db()
     project_id = request.headers.get("project_id")
     section_id = request.headers.get("section_id")
     task_id = request.headers.get("task_id")
     return edit_task(db=db, task=task, project_id=project_id, section_id=section_id, task_id=task_id)
 
-@router.delete("/delete")
+@router.delete("/delete",
+    dependencies=[Depends(auth.authentication_middleware)])
 async def delete(
     request: Request,
-    testing: bool = False
 ):
-    db = get_db(testing)
+    db = get_db()
     return del_task(db=db, task_id=request.headers.get("task_id"))
 
 
@@ -59,7 +65,9 @@ def get_task(db: Session, task_id: str):
 def get_tasks(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Task).offset(skip).limit(limit).all()
 
-def create_task(db: Session, task: schemas.TaskCreate, project_id: str):
+def create_task(db: Session, task: schemas.TaskCreate, project_id: str, owner: str):
+    if(get_project(db=db, project_id=project_id).owner != owner):
+        raise HTTPException(status_code=401, detail='Not your Project');
     db_task = models.Task(
         **task.dict(),
         project_id=project_id,

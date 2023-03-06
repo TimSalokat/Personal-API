@@ -4,27 +4,18 @@ from sqlalchemy.orm import sessionmaker
 
 from termcolor import colored
 
-TESTING_DATABASE_URL = "sqlite:///./testing.db"
-PERSISTENT_DATABASE_URL = "sqlite:///./persistent.db"
+BASE_DATABASE_URL = "sqlite:///./database.db"
 
-testing_engine = create_engine(
-    TESTING_DATABASE_URL, connect_args={"check_same_thread": False}
-)
-persistent_engine = create_engine(
-    PERSISTENT_DATABASE_URL, connect_args={"check_same_thread": False}
+base_engine = create_engine(
+    BASE_DATABASE_URL, connect_args={"check_same_thread": False}
 )
 
-SessionTesting = sessionmaker(autocommit=False, autoflush=False, bind=testing_engine)
-SessionPersistent = sessionmaker(autocommit=False, autoflush=False, bind=persistent_engine)
+SessionMaker = sessionmaker(autocommit=False, autoflush=False, bind=base_engine)
 
 Base = declarative_base()
 
-def get_db(testing=False):
-    if(testing):
-        print(colored("Using testing", "yellow"))
-        db = SessionTesting()
-    else:
-        db = SessionPersistent()
+def get_db():
+    db = SessionMaker()
     try:
         return db
     finally:

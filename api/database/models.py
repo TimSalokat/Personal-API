@@ -7,6 +7,7 @@ class Project(Base):
     __tablename__ = "projects"
 
     id = Column(String, primary_key=True, index=True)
+    owner = Column(String, ForeignKey("users.name"))
     title = Column(String, unique=True, index=True)
 
     sections = relationship("Section", primaryjoin="Project.id == Section.project_id", cascade="all, delete-orphan")
@@ -34,3 +35,12 @@ class Task(Base):
     description = Column(String, index=True)
     priority = Column(Integer)
     finished = Column(Boolean)
+
+class User(Base): 
+    __tablename__ = "users"
+
+    name = Column(String, unique=True, primary_key=True, index=True)
+    password = Column(String)
+    role = Column(String)
+
+    # projects = relationship("Project", primaryjoin="User.name == Project.owner", cascade="all, delete-orphan")

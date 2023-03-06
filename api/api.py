@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .database import models, schemas
-from .database.database import SessionTesting, SessionPersistent, testing_engine, persistent_engine, get_db
+from .database.database import base_engine, get_db
 
 from fastapi import FastAPI, Depends, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,24 +15,22 @@ from starlette.requests import Request
 from termcolor import colored
 
 from .routes.task_tracker import projects, tasks, sections
+from .routes.auth import auth, users
+from .routes.admin import admin
 
-models.Base.metadata.create_all(bind=testing_engine)
-models.Base.metadata.create_all(bind=persistent_engine)
-
-def get_persistent_db():
-    db = SessionPersistent()
-    try:
-        return db
-    finally:
-        db.close()
+models.Base.metadata.create_all(bind=base_engine)
 
 app = FastAPI()
+
+app.include_router(admin.router, prefix="/admin", tags=["Admin Routes"])
+app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+app.include_router(users.router, prefix="/users", tags=["User Management"])
 
 app.include_router(projects.router, prefix="/projects", tags=["Projects"])
 app.include_router(sections.router, prefix="/sections", tags=["Sections"])
 app.include_router(tasks.router, prefix="/tasks", tags=["Tasks"])
 
-router = APIRouter();
+router = APIRouter()
 
 origins = [
     "http://localhost:3000",
@@ -43,12 +41,26 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    # allow_origins = origins,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]    
 )
+
+def add_admin(db):
+    if(users.get_user(db, "admin")):
+        return
+    else:
+        hashed_pwd = users.pwd_context.hash("admin");
+        db_user = models.User(
+            name="admin",
+            password=hashed_pwd,
+            role="admin",)
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user) 
+
+add_admin(get_db())
 
 def log(message, color="green"):
     prefix = colored("[Back-Log]", "green")

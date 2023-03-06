@@ -40,6 +40,7 @@ class ProjectCreate(ProjectBase):
 
 class Project(ProjectBase):
     id: str
+    owner: str
 
     sections: List[Section] = []
     total_tasks: int
@@ -47,3 +48,18 @@ class Project(ProjectBase):
 
     class Config:
         orm_mode = True
+
+class UserBase(BaseModel):
+    name: str
+    password: str
+
+class UserCreate(UserBase):
+    pass
+
+class User(UserBase):
+    role: str
+    # projects: List[Project] = []
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str

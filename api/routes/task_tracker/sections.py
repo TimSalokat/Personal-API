@@ -1,7 +1,7 @@
 
 import sys, os
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from starlette.requests import Request 
 from sqlalchemy.orm import Session
 
@@ -10,24 +10,26 @@ import uuid, random
 from ...database import models, schemas
 from ...database.database import get_db
 
+from ..auth import auth
+
 router = APIRouter()
 
-@router.post("/add")
+@router.post("/add",
+    dependencies=[Depends(auth.authentication_middleware)])
 async def add(
     section: schemas.SectionCreate,
-    request: Request,
-    testing: bool = False
+    request: Request
 ):
-    db = get_db(testing)
+    db = get_db()
     project_id = request.headers.get("project_id")
     return create_section(db=db, section=section, project_id=project_id)
 
-@router.put("/edit")
+@router.put("/edit",
+    dependencies=[Depends(auth.authentication_middleware)])
 async def edit(
     request: Request,
-    testing: bool = False
 ):
-    db = get_db(testing)
+    db = get_db()
     section_id = request.headers.get("section_id")
     new_title = request.headers.get("new_title")
     return rename_section(db=db, section_id=section_id, new_title=new_title)
